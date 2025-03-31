@@ -7,76 +7,123 @@ from datetime import datetime
 file_path = r"C:\Users\jayni\Desktop\Important Links\stock_market_data.xlsx"
 
 def analyze_stock_data():
-    df = pd.read_excel(file_path, sheet_name="Sheet1")
+    try:
+        # Load data from Excel
+        df = pd.read_excel(file_path, sheet_name="Sheet1")
+        
+        # Convert 'Date' column to datetime format
+        df['Date'] = pd.to_datetime(df['Date'], errors='coerce')
+        
+        # Drop rows with invalid dates
+        df = df.dropna(subset=['Date'])
+        
+        # Extract year and month for month-wise analysis
+        df['Year-Month'] = df['Date'].dt.to_period('M')
+        
+        while True:
+            # User input for date range
+            start_date = input("Enter the start date (YYYY-MM-DD): ")
+            end_date = input("Enter the end date (YYYY-MM-DD): ")
+            
+            try:
+                start_date = pd.to_datetime(start_date)
+                end_date = pd.to_datetime(end_date)
+            except ValueError:
+                print("Invalid date format. Please enter dates in YYYY-MM-DD format.")
+                continue
+            
+            # Filter data for the selected date range
+            df_filtered = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
+            
+            if df_filtered.empty:
+                print("No data available for the selected date range. Try again.")
+                continue
+            
+            # Calculate daily returns
+            df_filtered["Daily Return"] = df_filtered.groupby("Stock Symbol")["Close"].pct_change()
+            
+            # Month-wise percentage change
+            monthly_change = df_filtered.groupby(['Stock Symbol', 'Year-Month'])['Close'].mean().pct_change().dropna()
+            print("Month-wise percentage change:")
+            print(monthly_change)
+            
+            # Select top 5 stocks based on highest average closing price
+            top_stocks = df_filtered.groupby("Stock Symbol")["Close"].mean().nlargest(5).index
+            df_selected = df_filtered[df_filtered["Stock Symbol"].isin(top_stocks)]
+            
+            # User selects visualization type
+            print("Choose a visualization type:")
+            print("1: Barchart\n2: Histogram\n3: Piechart\n4: Lineplot\n5: Linegraph\n6: Seaborn\n7: Matplotlib\n8: Areaplot\n9: Scatterplot")
+            
+            vis_type = input("Enter a number (1-9) for visualization: ").strip()
+            
+            plt.figure(figsize=(12, 6))
+            
+            if vis_type == "1":  # Barchart
+                df_selected.groupby("Stock Symbol")["Close"].mean().plot(kind='bar', color='blue')
+                plt.title("Average Closing Price of Top 5 Stocks")
+                plt.ylabel("Price")
+            
+            elif vis_type == "2":  # Histogram
+                sns.histplot(df_selected, x="Close", hue="Stock Symbol", bins=20, kde=True)
+                plt.title("Histogram of Closing Prices")
+            
+            elif vis_type == "3":  # Piechart
+                df_selected.groupby("Stock Symbol")["Close"].mean().plot(kind='pie', autopct='%1.1f%%')
+                plt.title("Market Share of Top 5 Stocks")
+                plt.ylabel("")
+            
+            elif vis_type == "4":  # Lineplot
+                sns.lineplot(data=df_selected, x="Date", y="Close", hue="Stock Symbol")
+                plt.title("Stock Prices Over Time (Lineplot)")
+            
+            elif vis_type == "5":  # Linegraph
+                for stock in top_stocks:
+                    stock_data = df_selected[df_selected["Stock Symbol"] == stock]
+                    plt.plot(stock_data["Date"], stock_data["Close"], label=stock)
+                plt.xlabel("Date")
+                plt.ylabel("Price")
+                plt.title("Stock Prices Over Time (Linegraph)")
+            
+            elif vis_type == "6":  # Seaborn
+                sns.boxplot(data=df_selected, x="Stock Symbol", y="Close")
+                plt.title("Stock Price Distribution")
+            
+            elif vis_type == "7":  # Matplotlib
+                plt.plot(df_selected["Date"], df_selected["Close"], linestyle='--', marker='o')
+                plt.xlabel("Date")
+                plt.ylabel("Close Price")
+                plt.title("Stock Price Trends using Matplotlib")
+            
+            elif vis_type == "8":  # Areaplot
+                df_pivot = df_selected.pivot(index="Date", columns="Stock Symbol", values="Close")
+                df_pivot.plot.area()
+                plt.title("Stock Price Area Plot")
+            
+            elif vis_type == "9":  # Scatterplot
+                sns.scatterplot(data=df_selected, x="Date", y="Close", hue="Stock Symbol")
+                plt.xticks(rotation=45)
+                plt.title("Stock Prices Scatterplot")
+            
+            else:
+                print("Invalid selection. Showing default line graph.")
+                for stock in top_stocks:
+                    stock_data = df_selected[df_selected["Stock Symbol"] == stock]
+                    plt.plot(stock_data["Date"], stock_data["Close"], label=stock)
+                plt.xlabel("Date")
+                plt.ylabel("Price")
+                plt.title("Stock Prices Over Time")
+            
+            plt.legend()
+            plt.show()
+            
+            # Ask if user wants another analysis
+            repeat = input("Would you like to analyze another range? (yes/no): ").strip().lower()
+            if repeat != "yes":
+                break
     
-    # Convert 'Date' column to datetime format
-    df['Date'] = pd.to_datetime(df['Date'])
-    
-    while True:
-        # Ask user for date range
-        start_date = input("Enter the start date (YYYY-MM-DD): ")
-        end_date = input("Enter the end date (YYYY-MM-DD): ")
-        
-        # Convert user input to datetime
-        df_filtered = df[(df['Date'] >= start_date) & (df['Date'] <= end_date)]
-        
-        # Calculate daily returns
-        df_filtered["Daily Return"] = df_filtered.groupby("Stock Symbol")["Close"].pct_change()
-        
-        # Select top 5 stocks based on highest average closing price
-        top_stocks = df_filtered.groupby("Stock Symbol")["Close"].mean().nlargest(5).index
-        df_selected = df_filtered[df_filtered["Stock Symbol"].isin(top_stocks)]
-        
-        # Ask user for visualization type
-        print("Choose a visualization type: bar, histogram, line graph, scatterplot, heatmap")
-        vis_type = input("Enter visualization type: ").strip().lower()
-        
-        # Generate visualization
-        plt.figure(figsize=(12, 6))
-        
-        if vis_type == "bar":
-            df_selected.groupby("Stock Symbol")["Close"].mean().plot(kind='bar', color='blue')
-            plt.title("Average Closing Price of Top 5 Stocks")
-            plt.ylabel("Price")
-        
-        elif vis_type == "histogram":
-            sns.histplot(df_selected, x="Close", hue="Stock Symbol", bins=20, kde=True)
-            plt.title("Histogram of Closing Prices")
-        
-        elif vis_type == "line graph":
-            for stock in top_stocks:
-                stock_data = df_selected[df_selected["Stock Symbol"] == stock]
-                plt.plot(stock_data["Date"], stock_data["Close"], label=stock)
-            plt.xlabel("Date")
-            plt.ylabel("Price")
-            plt.title("Stock Prices Over Time")
-        
-        elif vis_type == "scatterplot":
-            sns.scatterplot(data=df_selected, x="Date", y="Close", hue="Stock Symbol")
-            plt.xticks(rotation=45)
-            plt.title("Stock Prices Scatterplot")
-        
-        elif vis_type == "heatmap":
-            pivot_table = df_selected.pivot(index="Date", columns="Stock Symbol", values="Close")
-            sns.heatmap(pivot_table, cmap="coolwarm", linewidths=0.5)
-            plt.title("Stock Price Heatmap")
-        
-        else:
-            print("Invalid selection. Showing default line graph.")
-            for stock in top_stocks:
-                stock_data = df_selected[df_selected["Stock Symbol"] == stock]
-                plt.plot(stock_data["Date"], stock_data["Close"], label=stock)
-            plt.xlabel("Date")
-            plt.ylabel("Price")
-            plt.title("Stock Prices Over Time")
-        
-        plt.legend()
-        plt.show()
-        
-        # Ask user if they want to analyze another range
-        repeat = input("Would you like to analyze another range? (yes/no): ").strip().lower()
-        if repeat != "yes":
-            break
+    except Exception as e:
+        print(f"An error occurred: {e}")
 
 if __name__ == "__main__":
     analyze_stock_data()
